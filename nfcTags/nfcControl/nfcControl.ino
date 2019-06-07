@@ -9,7 +9,11 @@
 
 byte ssPins[] = {SS_1_PIN, SS_2_PIN};
 
+int isBattery[] = {0, 0};
+bool isNFC;
+
 MFRC522 mfrc522[NR_OF_READERS];   // Create MFRC522 instance.
+void dump_byte_array(byte *buffer, byte bufferSize);
 
 /**
  * Initialize.
@@ -23,10 +27,8 @@ void setup() {
 
   for (uint8_t reader = 0; reader < NR_OF_READERS; reader++) {
     mfrc522[reader].PCD_Init(ssPins[reader], RST_PIN); // Init each MFRC522 card
-    //Serial.print(F("Reader "));
-    //Serial.print(reader);
-    //Serial.print(F(": "));
     mfrc522[reader].PCD_DumpVersionToSerial();
+    isBattery[reader] = mfrc522[reader].PICC_IsNewCardPresent();
   }
 }
 
@@ -36,30 +38,39 @@ void setup() {
 void loop() {
 
   for (uint8_t reader = 0; reader < NR_OF_READERS; reader++) {
+    if (mfrc522[reader].PICC_IsNewCardPresent()) {
+        isNFC = true;
+        mfrc522[reader].PICC_IsNewCardPresent();
+    } else {
+        isNFC = false;
+    }
     
     // Look for new cards
-    //Serial.println(String(reader)+" -> " + String(mfrc522[reader].PICC_IsNewCardPresent())); 
-    //mfrc522[reader].PICC_IsNewCardPresent() && 
-    if (mfrc522[reader].PICC_IsNewCardPresent() && mfrc522[reader].PICC_ReadCardSerial()) {
-      //Serial.print(F("Reader "));
-      //Serial.print(reader);
-      // Show some details of the PICC (that is: the tag/card)
-      //Serial.print(F(": Card UID:"));
-      Serial.print(mfrc522[reader].uid.uidByte, HEX);
-      //dump_byte_array(mfrc522[reader].uid.uidByte, mfrc522[reader].uid.size);
-      Serial.println();
-      //Serial.print(F("PICC type: "));
-      MFRC522::PICC_Type piccType = mfrc522[reader].PICC_GetType(mfrc522[reader].uid.sak);
-      //Serial.println(mfrc522[reader].PICC_GetTypeName(piccType));
+    if (isBattery[reader] != isNFC) {
+        isBattery[reader] = isNFC; 
+               
+        if (isNFC) {
+                  Serial.println("There is a new battery \n");
+                  
+                  if (mfrc522[reader].PICC_ReadCardSerial()) {
+                     
+                      dump_byte_array(mfrc522[reader].uid.uidByte, mfrc522[reader].uid.size);
+                      MFRC522::PICC_Type piccType = mfrc522[reader].PICC_GetType(mfrc522[reader].uid.sak);
+                
+                      // Halt PICC
+                      mfrc522[reader].PICC_HaltA();
+                      // Stop encryption on PCD
+                      mfrc522[reader].PCD_StopCrypto1();
+                  }
+                  
 
-      // Halt PICC
-      mfrc522[reader].PICC_HaltA();
-      // Stop encryption on PCD
-      mfrc522[reader].PCD_StopCrypto1();
-      
-    } //if (mfrc522[reader].PICC_IsNewC
-  } //for(uint8_t reader
-  delay(2000);
+        } else {
+              Serial.println("Holi");
+        }
+    }
+
+  } 
+  delay(1000);
 }
 
 /**
@@ -67,7 +78,8 @@ void loop() {
  */
 void dump_byte_array(byte *buffer, byte bufferSize) {
   for (byte i = 0; i < bufferSize; i++) {
-    //Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], HEX);
   }
+  Serial.println();
 }
